@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>聊天接收端</title>
+  <!-- <script src="https://unpkg.com/peerjs@1.3.2/dist/peerjs.min.js"></script> -->
+  <script src="./js/peerjs.min.js"></script>
+  <script>
+    var peer = null; 
+    var startId = null; 
+    var receiveId = null;
+    var conn = null;
+
+    //输入框回车处理
+    function keyup_submit(e){ 
+      var evt = window.event || e; 
+      if (evt.keyCode == 13){
+          sendMessage()
+        }
+    }
+    //发送消息的函数
+    sendMessage = function () {
+        console.log("sendMessage")
+        let message = document.getElementById("messageText").value;
+        //消息体
+        // var message = { "from": receiveId, "to": startId, "body": document.getElementById("messageText").value };
+        if (!conn) {
+            //创建到对方的连接
+            conn = peer.connect(startId);
+            conn.on('open', () => {
+                //首次发送消息
+                conn.send(message);
+                //把信息添加到页面
+                document.getElementById("chatContext").innerHTML += `<div class="right"><span>${message}</span></div>`
+                document.getElementById("messageText").value = null
+            });
+        }
+
+        //发送消息
+        if (conn.open) {
+           conn.send(message);
+           //把信息添加到页面
+           document.getElementById("chatContext").innerHTML += `<div class="right"><span>${message}</span></div>`
+           document.getElementById("messageText").value = null
+        }
+
+        //移动到消息底部
+        container = document.getElementById("chatContext")
+        container.scrollTop = container.scrollHeight;
+    }
+
+    //获取url后面的参数
+    getRequest = function() { 
+        var url = location.search; 
+        var theRequest = new Object(); 
+        if (url.indexOf("?") != -1) { 
+            let str = url.substr(1); 
+            let strs = str.split("&"); 
+            for(let i = 0; i < strs.length; i++) { 
+                theRequest[strs[i].split("=")[0]]=unescape(strs[i].split("=")[1]); 
+            } 
+        } 
+        return theRequest; 
+    },
+
+    //页面加载后 创建Peer对象 主动建立连接 并发送一个”我来了“
+    window.onload = function () {
+      //加载聊天记录
+      if(localStorage.getItem("chatContext"))
+        document.getElementById("chatContext").innerHTML += JSON.parse(localStorage.getItem("chatContext"))
+      //获取参数
+      param = getRequest();
+      startId = param.startId;
+      //每次使用同一个id
+      if(!localStorage.getItem("receiveId")){
+        receiveId = new Date().getTime();
+        localStorage.setItem("receiveId",receiveId)
+      }else{
+        receiveId = localStorage.getItem("receiveId")
+      }
+      peer = new Peer(receiveId); //第一个参数为id 第二个参数为选项 ('',{"debug":3})
+      console.log(peer)
+      peer.on('open', function(id) {
+        receiveId = id;
+        console.log('My peer ID is: ' + id);
+        //这里先想start建立连接，让start知道这个端的id（reveivedId）
+        conn = peer.connect(startId);
+        conn.on('open', () => {
+              //首次发送消息
+              console.log("发送消息")
+              conn.send("我来了");
+              document.getElementById("chatContext").innerHTML += `<div class="right"><span>我来了</span></div>`
+        });
+      });
+      peer.on('connection', function(conn) {
+        console.log("被连接",conn);
+        conn.on('data', (data) => {
+            console.log("收到消息",data);
+            document.getElementById("chatContext").innerHTML += `<div class="left"><span>${data}</span></div>`
+        });
+      });
+
+    }
+
+    //页面刷新前保存聊天记录
+    window.addEventListener("beforeunload", function (e) {
+      localStorage.setItem("chatContext",JSON.stringify(document.getElementById("chatContext").innerHTML))
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h2 align="center">基于<a target="_blank" href="https://peerjs.com">PeerJS</a>的点对点聊天Demo</h2>
+    <div id="chatContext">
+    </div>
+    <div class="bottom">
+      <input style="width: 80%;height: 30px;" type="text" onkeydown="keyup_submit(event)" name="" id="messageText">
+      <button style="height: 36px;" onclick="sendMessage()">发 送</button>
+    </div>
+  </div>
+  
+  
+</body>
+<style>
+  .container {
+    position: relative;
+    max-width: 360px;
+    height: 80vh;
+    margin: 0 auto;
+    border: 3px solid #ccc;
+    padding: 10px;
+    background-color: #F5F5F5;
+  }
+  #chatContext {
+    border-top: 2px solid #ccc;
+    padding: 10px 0;
+    height: 60vh;
+    overflow-y: scroll;
+  }
+  #chatContext:after{
+    content:"";
+    display:block;
+    visibility:hidden;
+    clear:both;
+  }
+  .left {
+    text-align: left;
+    margin: 15px;
+  }
+  .left span {
+    background-color: #FFFFFF;
+    padding: 4px 8px;
+  }
+  .right {
+    text-align: right;
+    margin: 15px;
+  }
+  .right span{
+    background-color: #9EEA6A;
+    padding: 4px 8px;
+  }
+  .bottom {
+    width: 100%;
+    position: absolute;
+    bottom: 20px;
+  }
+</style>
+</html>
